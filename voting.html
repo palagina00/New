@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Голосование за лучшее белье - Бренд нижнего белья</title>
+    <link rel="stylesheet" href="voting-style.css?v=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>💕 Голосование за лучшее белье</h1>
+            <p>Представьте, что вы решили побаловать себя новым шелковым бельем. Что бы вы выбрали из представленных вариантов?</p>
+            <p>Выберите до 5 понравившихся моделей</p>
+            <div class="vote-counter">
+                <span>Голосов использовано: </span>
+                <span id="votesUsed">0</span>
+                <span>/5</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="voting-grid" id="votingGrid">
+                <!-- Фотографии будут добавлены через JavaScript -->
+            </div>
+        </main>
+
+        <div class="voting-actions">
+            <button id="submitVotes" class="btn btn-primary" disabled>
+                ✅ Отправить голоса
+            </button>
+            <button id="resetVotes" class="btn btn-secondary">
+                🔄 Сбросить выбор
+            </button>
+        </div>
+
+        <!-- Форма обратной связи -->
+        <section class="feedback-section">
+            <h2>💬 Предложите свое фото</h2>
+            <p>Есть варианты белья мечты? Поделитесь своими предложениями!</p>
+            
+            <form id="feedbackForm" class="feedback-form">
+                <div class="form-group">
+                    <label for="feedbackName">Ваше имя (необязательно)</label>
+                    <input type="text" id="feedbackName" name="name" placeholder="Введите ваше имя">
+                </div>
+                
+                <div class="form-group">
+                    <label for="feedbackMessage">Сообщение *</label>
+                    <textarea id="feedbackMessage" name="message" placeholder="Опишите ваше предложение..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="feedbackPhoto">Прикрепить фото (необязательно)</label>
+                    <div class="file-upload">
+                        <input type="file" id="feedbackPhoto" name="photo" accept="image/*" multiple>
+                        <label for="feedbackPhoto" class="file-upload-label">
+                            <span class="file-upload-icon">📷</span>
+                            <span class="file-upload-text">Выберите фото или перетащите сюда</span>
+                        </label>
+                    </div>
+                    <div id="photoPreview" class="photo-preview-container"></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">📤 Отправить предложение</button>
+                    <button type="reset" class="btn btn-secondary">🔄 Очистить</button>
+                </div>
+            </form>
+        </section>
+
+        <div class="admin-link">
+            <a href="admin.html" class="admin-btn">📊 Результаты (только для администратора)</a>
+        </div>
+    </div>
+
+    <script src="voting-script-sync.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты голосования - Админ-панель</title>
+    <link rel="stylesheet" href="admin-style.css?v=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>📊 Результаты голосования</h1>
+            <p>Статистика голосов за фотографии белья</p>
+            <p class="last-update">Последнее обновление: <span id="lastUpdate">загрузка...</span></p>
+            <div class="header-actions">
+                <button id="refreshData" class="btn btn-primary">🔄 Обновить данные</button>
+                <button id="exportData" class="btn btn-secondary">📥 Экспорт данных</button>
+                <button id="clearData" class="btn btn-danger">🗑️ Очистить все данные</button>
+                <a href="voting.html" class="btn btn-outline">← Вернуться к голосованию</a>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Общая статистика -->
+            <section class="stats-section">
+                <h2>📈 Общая статистика</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalVotes">0</div>
+                        <div class="stat-label">Всего голосов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalVoters">0</div>
+                        <div class="stat-label">Участников</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="mostVoted">0</div>
+                        <div class="stat-label">Максимум голосов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="avgVotes">0</div>
+                        <div class="stat-label">Среднее голосов</div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- Таблица результатов -->
+            <section class="table-section">
+                <h2>📋 Детальные результаты</h2>
+                <div class="table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>Фотография</th>
+                                <th>Название</th>
+                                <th>Голоса</th>
+                                <th>Процент</th>
+                                <th>График</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Данные будут добавлены через JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Топ-5 -->
+            <section class="top-section">
+                <h2>🏆 Топ-5 фотографий</h2>
+                <div class="top-grid" id="topGrid">
+                    <!-- Топ фотографии будут добавлены через JavaScript -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="voting-script-sync.js?v=1"></script>
+    <script src="admin-script-sync.js?v=1"></script>
+</body>
+</html>
