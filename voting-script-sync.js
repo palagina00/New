@@ -117,8 +117,8 @@ let hasVoted = false;
 let isDataLoading = false;
 
 // URL для GitHub API
-const GITHUB_API_URL = 'https://api.github.com/repos/palagina00/1/contents/data.json';
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/1/main/data.json';
+const GITHUB_API_URL = 'https://api.github.com/repos/palagina00/New/contents/data.json';
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/data.json';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
