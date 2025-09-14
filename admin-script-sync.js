@@ -2,6 +2,7 @@
 // Версия: 2.0 - Добавлена синхронизация данных
 
 let votingResults = [];
+let isDataLoading = false;
 
 // URL для GitHub API
 const ADMIN_GITHUB_API_URL = 'https://api.github.com/repos/palagina00/New/contents/data.json';
@@ -72,7 +73,6 @@ function loadLocalVotingData() {
     } else {
         votingResults = [];
     }
-    
     console.log('Загружены локальные данные:', votingResults);
     updateAllData();
 }
@@ -171,7 +171,6 @@ function updateTop5() {
     top5.forEach((photo, index) => {
         const item = document.createElement('div');
         item.className = `top-item rank-${index + 1}`;
-        
         const percentage = totalVotes > 0 ? ((photo.votes / totalVotes) * 100).toFixed(1) : 0;
         
         item.innerHTML = `
@@ -266,9 +265,6 @@ async function saveDataToGitHub(data) {
 
 // Получение токена GitHub
 function getGitHubToken() {
-    // Токен берется из localStorage для безопасности
-    // Чтобы добавить токен, выполните в консоли браузера:
-    // localStorage.setItem('github_token', 'ваш_токен_здесь');
     return localStorage.getItem('github_token') || '';
 }
 
@@ -283,7 +279,6 @@ function exportData() {
     
     const dataStr = JSON.stringify(data, null, 2);
     const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    
     const link = document.createElement('a');
     link.href = URL.createObjectURL(dataBlob);
     link.download = `voting-results-${new Date().toISOString().split('T')[0]}.json`;
@@ -297,6 +292,7 @@ function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
+    
     notification.style.cssText = `
         position: fixed;
         top: 20px;
