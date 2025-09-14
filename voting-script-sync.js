@@ -219,17 +219,36 @@ async function createInitialDataFile() {
 // Сохранение данных на GitHub
 async function saveDataToGitHub(data) {
     try {
-        // Получаем текущий файл
-        const getResponse = await fetch(GITHUB_API_URL);
-        let sha = null;
+        console.log('Попытка сохранения на GitHub...');
         
+        // Проверяем токен
+        const token = getGitHubToken();
+        if (!token) {
+            console.log('Токен GitHub не найден, сохраняем локально');
+            saveLocalVotingData(data);
+            return false;
+        }
+        
+        // Получаем текущий файл
+        console.log('Получаем текущий файл...');
+        const getResponse = await fetch(GITHUB_API_URL, {
+            headers: {
+                'Authorization': 'token ' + token
+            }
+        });
+        
+        let sha = null;
         if (getResponse.ok) {
             const fileData = await getResponse.json();
             sha = fileData.sha;
+            console.log('SHA получен:', sha);
+        } else {
+            console.log('Файл не найден, создаем новый');
         }
         
         // Подготавливаем данные для отправки
         const content = btoa(JSON.stringify(data, null, 2));
+        console.log('Данные подготовлены для отправки');
         
         const updateData = {
             message: `Обновление голосования - ${new Date().toLocaleString()}`,
@@ -238,24 +257,36 @@ async function saveDataToGitHub(data) {
         };
         
         // Отправляем обновление
+        console.log('Отправляем данные на GitHub...');
         const response = await fetch(GITHUB_API_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'token ' + getGitHubToken()
+                'Authorization': 'token ' + token
             },
             body: JSON.stringify(updateData)
         });
+        
+        console.log('Ответ от GitHub:', response.status, response.statusText);
         
         if (response.ok) {
             console.log('Данные сохранены на GitHub');
             return true;
         } else {
-            throw new Error('Ошибка сохранения на GitHub');
+            const errorText = await response.text();
+            console.error('Ошибка GitHub API:', errorText);
+            throw new Error(`GitHub API ошибка: ${response.status} - ${errorText}`);
         }
     } catch (error) {
         console.error('Ошибка сохранения данных:', error);
+        console.error('Детали ошибки:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        
         // Fallback: сохраняем локально
+        console.log('Fallback: сохраняем локально');
         saveLocalVotingData(data);
         return false;
     }
@@ -514,22 +545,22 @@ async function submitVotes() {
         // Сохраняем на GitHub
         const saved = await saveDataToGitHub(dataToSave);
         
+        // Сохраняем локально в любом случае
+        saveLocalVotingData(dataToSave);
+        
+        // Отмечаем, что пользователь проголосовал
+        hasVoted = true;
+        
+        // Показываем сообщение об успехе
+        showVotingComplete();
+        
+        // Блокируем интерфейс
+        blockVotingInterface();
+        
         if (saved) {
-            // Сохраняем локально как backup
-            saveLocalVotingData(dataToSave);
-            
-            // Отмечаем, что пользователь проголосовал
-            hasVoted = true;
-            
-            // Показываем сообщение об успехе
-            showVotingComplete();
-            
-            // Блокируем интерфейс
-            blockVotingInterface();
-            
             showNotification('Голосование успешно отправлено!', 'success');
         } else {
-            throw new Error('Ошибка сохранения на сервере');
+            showNotification('Голосование сохранено локально. Данные будут синхронизированы позже.', 'success');
         }
     } catch (error) {
         console.error('Ошибка отправки голосов:', error);
