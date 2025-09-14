@@ -124,6 +124,10 @@ const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/da
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Система голосования с синхронизацией загружена');
     
+    // Определяем мобильное устройство
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('Мобильное устройство:', isMobile);
+    
     // Проверяем, голосовал ли пользователь уже
     checkVotingStatus();
     
@@ -364,27 +368,69 @@ function createVotingItem(photo) {
 
 // Настройка обработчиков событий
 function setupEventListeners() {
-    // Обработчик клика по кнопке голосования
+    // Обработчик клика по кнопке голосования (поддержка touch и click)
     document.addEventListener('click', function(e) {
+        console.log('Click event:', e.target);
         if (e.target.classList.contains('vote-button') && !e.target.disabled) {
+            console.log('Vote button clicked');
+            handleVoteClick(e.target.dataset.photoId);
+        }
+    });
+    
+    // Добавляем поддержку touch-событий для мобильных устройств
+    document.addEventListener('touchend', function(e) {
+        console.log('Touch event:', e.target);
+        if (e.target.classList.contains('vote-button') && !e.target.disabled) {
+            console.log('Vote button touched');
+            e.preventDefault(); // Предотвращаем двойной вызов
             handleVoteClick(e.target.dataset.photoId);
         }
     });
     
     // Обработчик отправки голосов
-    document.getElementById('submitVotes').addEventListener('click', submitVotes);
+    const submitBtn = document.getElementById('submitVotes');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', submitVotes);
+        submitBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            submitVotes();
+        });
+    }
     
     // Обработчик сброса голосов
-    document.getElementById('resetVotes').addEventListener('click', resetVotes);
+    const resetBtn = document.getElementById('resetVotes');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetVotes);
+        resetBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            resetVotes();
+        });
+    }
 }
 
 // Обработка клика по голосованию
 function handleVoteClick(photoId) {
-    if (hasVoted) return;
+    console.log('handleVoteClick вызвана с photoId:', photoId);
+    console.log('hasVoted:', hasVoted);
+    
+    if (hasVoted) {
+        console.log('Пользователь уже голосовал, выход');
+        return;
+    }
     
     const photoIdNum = parseInt(photoId);
+    console.log('photoIdNum:', photoIdNum);
+    
     const item = document.querySelector(`[data-photo-id="${photoId}"]`);
+    console.log('item найден:', !!item);
+    
+    if (!item) {
+        console.error('Элемент с data-photo-id не найден!');
+        return;
+    }
+    
     const button = item.querySelector('.vote-button');
+    console.log('button найден:', !!button);
     
     if (selectedVotes.includes(photoIdNum)) {
         // Убираем голос
@@ -423,13 +469,25 @@ function updateSubmitButton() {
 
 // Отправка голосов
 async function submitVotes() {
+    console.log('submitVotes вызвана');
+    console.log('selectedVotes:', selectedVotes);
+    console.log('selectedVotes.length:', selectedVotes.length);
+    
     if (selectedVotes.length === 0) {
+        console.log('Нет выбранных голосов');
         alert('Выберите хотя бы одну фотографию!');
         return;
     }
     
     // Показываем индикатор загрузки
     const submitBtn = document.getElementById('submitVotes');
+    console.log('submitBtn найден:', !!submitBtn);
+    
+    if (!submitBtn) {
+        console.error('Кнопка submitVotes не найдена!');
+        return;
+    }
+    
     const originalText = submitBtn.textContent;
     submitBtn.textContent = '⏳ Отправка...';
     submitBtn.disabled = true;
@@ -475,7 +533,34 @@ async function submitVotes() {
         }
     } catch (error) {
         console.error('Ошибка отправки голосов:', error);
-        showNotification('Ошибка отправки голосов. Попробуйте еще раз.', 'error');
+        console.error('Детали ошибки:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        // Показываем более детальную ошибку для отладки
+        let errorMessage = 'Ошибка отправки голосов. ';
+        if (error.message.includes('fetch')) {
+            errorMessage += 'Проблема с интернет-соединением. ';
+        } else if (error.message.includes('CORS')) {
+            errorMessage += 'Проблема с доступом к серверу. ';
+        } else if (error.message.includes('token')) {
+            errorMessage += 'Проблема с авторизацией. ';
+        }
+        errorMessage += 'Попробуйте еще раз.';
+        
+        showNotification(errorMessage, 'error');
+        
+        // Сохраняем голоса локально как fallback
+        console.log('Сохраняем голоса локально как fallback');
+        saveLocalVotingData({
+            votes: lingeriePhotos.reduce((acc, photo) => {
+                acc[photo.id] = photo.votes;
+                return acc;
+            }, {}),
+            lastUpdate: new Date().toISOString()
+        });
     } finally {
         // Восстанавливаем кнопку
         submitBtn.textContent = originalText;
