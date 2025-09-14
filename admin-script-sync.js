@@ -40,7 +40,7 @@ async function loadVotingDataFromGitHub() {
                     votingResults.push({
                         id: parseInt(photoId),
                         title: `Фото ${photoId}`,
-                        image: `images/${photoId === 12 ? '1-1' : photoId === 13 ? '1-1-1' : photoId === 14 ? '1-1-2' : photoId === 15 ? '1-2' : photoId}.jpg`,
+                        image: `images/${photoId}.jpg`,
                         votes: data.votes[photoId]
                     });
                 });
