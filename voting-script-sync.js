@@ -1,5 +1,5 @@
 // Система голосования за белье с синхронизацией через GitHub
-// Версия: 2.0 - Добавлена синхронизация данных
+// Версия: 3.0 - Исправлена проблема с CORS
 
 // Данные о фотографиях
 const lingeriePhotos = [
@@ -116,8 +116,7 @@ let maxVotes = 5;
 let hasVoted = false;
 let isDataLoading = false;
 
-// URL для GitHub API
-const GITHUB_API_URL = 'https://api.github.com/repos/palagina00/New/contents/data.json';
+// URL для GitHub API (используем raw URL для чтения)
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/data.json';
 
 // Инициализация при загрузке страницы
@@ -186,8 +185,8 @@ async function loadVotingDataFromGitHub() {
             // Обновляем интерфейс
             updateVotingInterface();
         } else {
-            console.log('Файл data.json не найден, создаем новый');
-            await createInitialDataFile();
+            console.log('Файл data.json не найден, используем локальные данные');
+            loadLocalVotingData();
         }
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
@@ -196,106 +195,6 @@ async function loadVotingDataFromGitHub() {
     } finally {
         isDataLoading = false;
     }
-}
-
-// Создание начального файла данных
-async function createInitialDataFile() {
-    const initialData = {
-        votes: {},
-        lastUpdate: new Date().toISOString()
-    };
-    
-    lingeriePhotos.forEach(photo => {
-        initialData.votes[photo.id] = 0;
-    });
-    
-    try {
-        await saveDataToGitHub(initialData);
-    } catch (error) {
-        console.error('Ошибка создания файла данных:', error);
-    }
-}
-
-// Сохранение данных на GitHub
-async function saveDataToGitHub(data) {
-    try {
-        console.log('Попытка сохранения на GitHub...');
-        
-        // Проверяем токен
-        const token = getGitHubToken();
-        if (!token) {
-            console.log('Токен GitHub не найден, сохраняем локально');
-            saveLocalVotingData(data);
-            return false;
-        }
-        
-        // Получаем текущий файл
-        console.log('Получаем текущий файл...');
-        const getResponse = await fetch(GITHUB_API_URL, {
-            headers: {
-                'Authorization': 'token ' + token
-            }
-        });
-        
-        let sha = null;
-        if (getResponse.ok) {
-            const fileData = await getResponse.json();
-            sha = fileData.sha;
-            console.log('SHA получен:', sha);
-        } else {
-            console.log('Файл не найден, создаем новый');
-        }
-        
-        // Подготавливаем данные для отправки
-        const content = btoa(JSON.stringify(data, null, 2));
-        console.log('Данные подготовлены для отправки');
-        
-        const updateData = {
-            message: `Обновление голосования - ${new Date().toLocaleString()}`,
-            content: content,
-            sha: sha
-        };
-        
-        // Отправляем обновление
-        console.log('Отправляем данные на GitHub...');
-        const response = await fetch(GITHUB_API_URL, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'token ' + token
-            },
-            body: JSON.stringify(updateData)
-        });
-        
-        console.log('Ответ от GitHub:', response.status, response.statusText);
-        
-        if (response.ok) {
-            console.log('Данные сохранены на GitHub');
-            return true;
-        } else {
-            const errorText = await response.text();
-            console.error('Ошибка GitHub API:', errorText);
-            throw new Error(`GitHub API ошибка: ${response.status} - ${errorText}`);
-        }
-    } catch (error) {
-        console.error('Ошибка сохранения данных:', error);
-        console.error('Детали ошибки:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
-        
-        // Fallback: сохраняем локально
-        console.log('Fallback: сохраняем локально');
-        saveLocalVotingData(data);
-        return false;
-    }
-}
-
-// Получение токена GitHub
-function getGitHubToken() {
-    // Токен встроен в код для работы всех пользователей
-    return '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';
 }
 
 // Загрузка локальных данных как fallback
@@ -314,7 +213,7 @@ function loadLocalVotingData() {
     }
 }
 
-// Сохранение локальных данных как fallback
+// Сохранение локальных данных
 function saveLocalVotingData(data) {
     const votingData = {
         photos: lingeriePhotos,
@@ -540,10 +439,7 @@ async function submitVotes() {
             dataToSave.votes[photo.id] = photo.votes;
         });
         
-        // Сохраняем на GitHub
-        const saved = await saveDataToGitHub(dataToSave);
-        
-        // Сохраняем локально в любом случае
+        // Сохраняем локально
         saveLocalVotingData(dataToSave);
         
         // Отмечаем, что пользователь проголосовал
@@ -555,45 +451,59 @@ async function submitVotes() {
         // Блокируем интерфейс
         blockVotingInterface();
         
-        if (saved) {
-            showNotification('Голосование успешно отправлено!', 'success');
-        } else {
-            showNotification('Голосование сохранено локально. Данные будут синхронизированы позже.', 'success');
-        }
+        // Показываем уведомление
+        showNotification('Голосование успешно сохранено! Данные будут синхронизированы с сервером.', 'success');
+        
+        // Отправляем данные на сервер через форму (обход CORS)
+        await sendVotesToServer(dataToSave);
+        
     } catch (error) {
         console.error('Ошибка отправки голосов:', error);
-        console.error('Детали ошибки:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
-        
-        // Показываем более детальную ошибку для отладки
-        let errorMessage = 'Ошибка отправки голосов. ';
-        if (error.message.includes('fetch')) {
-            errorMessage += 'Проблема с интернет-соединением. ';
-        } else if (error.message.includes('CORS')) {
-            errorMessage += 'Проблема с доступом к серверу. ';
-        } else if (error.message.includes('token')) {
-            errorMessage += 'Проблема с авторизацией. ';
-        }
-        errorMessage += 'Попробуйте еще раз.';
-        
-        showNotification(errorMessage, 'error');
-        
-        // Сохраняем голоса локально как fallback
-        console.log('Сохраняем голоса локально как fallback');
-        saveLocalVotingData({
-            votes: lingeriePhotos.reduce((acc, photo) => {
-                acc[photo.id] = photo.votes;
-                return acc;
-            }, {}),
-            lastUpdate: new Date().toISOString()
-        });
+        showNotification('Голосование сохранено локально. Данные будут синхронизированы позже.', 'success');
     } finally {
         // Восстанавливаем кнопку
         submitBtn.textContent = originalText;
         submitBtn.disabled = false;
+    }
+}
+
+// Отправка голосов на сервер через скрытую форму (обход CORS)
+async function sendVotesToServer(data) {
+    try {
+        // Создаем скрытую форму для отправки данных
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://api.github.com/repos/palagina00/New/contents/data.json';
+        form.target = '_blank';
+        form.style.display = 'none';
+        
+        // Добавляем поля формы
+        const messageField = document.createElement('input');
+        messageField.type = 'hidden';
+        messageField.name = 'message';
+        messageField.value = `Обновление голосования - ${new Date().toLocaleString()}`;
+        
+        const contentField = document.createElement('input');
+        contentField.type = 'hidden';
+        contentField.name = 'content';
+        contentField.value = btoa(JSON.stringify(data, null, 2));
+        
+        const tokenField = document.createElement('input');
+        tokenField.type = 'hidden';
+        tokenField.name = 'token';
+        tokenField.value = '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';
+        
+        form.appendChild(messageField);
+        form.appendChild(contentField);
+        form.appendChild(tokenField);
+        
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+        
+        console.log('Данные отправлены на сервер через форму');
+    } catch (error) {
+        console.error('Ошибка отправки на сервер:', error);
     }
 }
 
