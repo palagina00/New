@@ -306,7 +306,7 @@ async function saveDataToGitHub(data) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'token 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'
+                'Authorization': 'token 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'
             },
             body: JSON.stringify(updateData)
         });
