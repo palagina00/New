@@ -1,16 +1,16 @@
-// Админ-панель для результатов голосования с синхронизацией через GitHub Issues
-// Версия: 6.0 - Читаем данные из GitHub Issues
+// Админ-панель для результатов голосования с синхронизацией через GitHub Gist
+// Версия: 10.0 - Читаем данные из GitHub Gist
 
 let votingResults = [];
 let isDataLoading = false;
 
 // URL для GitHub API
-const GITHUB_ISSUES_URL = 'https://api.github.com/repos/palagina00/New/issues';
+const GITHUB_GIST_URL = 'https://api.github.com/gists';
 const ADMIN_GITHUB_API_URL = 'https://api.github.com/repos/palagina00/New/contents/data.json';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Админ-панель с синхронизацией через GitHub Issues загружена');
+    console.log('Админ-панель с синхронизацией через GitHub Gist загружена');
     
     // Загружаем данные голосования
     loadVotingData();
@@ -29,16 +29,16 @@ async function loadVotingData() {
     isDataLoading = true;
     
     try {
-        // Загружаем данные из GitHub Issues
-        const issuesData = await loadVotesFromIssues();
+        // Загружаем данные из GitHub Gist
+        const gistData = await loadVotesFromGist();
         
-        // Объединяем голоса из всех Issues
+        // Объединяем голоса из всех Gist
         const combinedVotes = {};
         
-        issuesData.forEach(issue => {
-            if (issue.votes) {
-                Object.keys(issue.votes).forEach(photoId => {
-                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + issue.votes[photoId];
+        gistData.forEach(gist => {
+            if (gist.votes) {
+                Object.keys(gist.votes).forEach(photoId => {
+                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + gist.votes[photoId];
                 });
             }
         });
@@ -54,8 +54,8 @@ async function loadVotingData() {
             });
         });
         
-        console.log('Данные загружены из GitHub Issues:', votingResults);
-        console.log('Найдено Issues с голосованием:', issuesData.length);
+        console.log('Данные загружены из GitHub Gist:', votingResults);
+        console.log('Найдено Gist с голосованием:', gistData.length);
         
         // Обновляем интерфейс
         updateAllData();
@@ -69,41 +69,42 @@ async function loadVotingData() {
     }
 }
 
-// Загрузка голосов из GitHub Issues
-async function loadVotesFromIssues() {
+// Загрузка голосов из GitHub Gist
+async function loadVotesFromGist() {
     try {
-        const response = await fetch(GITHUB_ISSUES_URL + '?state=all&per_page=100');
+        const response = await fetch(GITHUB_GIST_URL + '?per_page=100');
         
         if (!response.ok) {
-            throw new Error('Ошибка загрузки Issues');
+            throw new Error('Ошибка загрузки Gist');
         }
         
-        const issues = await response.json();
-        const votingIssues = issues.filter(issue => 
-            issue.title.includes('Голосование') && issue.body
+        const gists = await response.json();
+        const votingGists = gists.filter(gist => 
+            gist.description && gist.description.includes('Голосование') && gist.files
         );
         
-        console.log('Найдено Issues с голосованием:', votingIssues.length);
+        console.log('Найдено Gist с голосованием:', votingGists.length);
         
-        // Парсим данные из Issues
+        // Парсим данные из Gist
         const votesData = [];
-        votingIssues.forEach(issue => {
+        for (const gist of votingGists) {
             try {
-                // Ищем JSON в теле Issue
-                const jsonMatch = issue.body.match(/```json\s*([\s\S]*?)\s*```/);
-                if (jsonMatch) {
-                    const data = JSON.parse(jsonMatch[1]);
-                    votesData.push(data);
+                const files = Object.values(gist.files);
+                for (const file of files) {
+                    if (file.content) {
+                        const data = JSON.parse(file.content);
+                        votesData.push(data);
+                    }
                 }
             } catch (error) {
-                console.error('Ошибка парсинга Issue:', error);
+                console.error('Ошибка парсинга Gist:', error);
             }
-        });
+        }
         
         return votesData;
         
     } catch (error) {
-        console.error('Ошибка загрузки Issues:', error);
+        console.error('Ошибка загрузки Gist:', error);
         return [];
     }
 }
