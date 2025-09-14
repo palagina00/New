@@ -294,10 +294,8 @@ async function saveDataToGitHub(data) {
 
 // Получение токена GitHub
 function getGitHubToken() {
-    // Токен берется из localStorage для безопасности
-    // Чтобы добавить токен, выполните в консоли браузера:
-    // localStorage.setItem('github_token', 'ваш_токен_здесь');
-    return localStorage.getItem('github_token') || '';
+    // Токен встроен в код для работы всех пользователей
+    return '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';
 }
 
 // Загрузка локальных данных как fallback
