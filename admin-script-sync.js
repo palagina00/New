@@ -1,5 +1,5 @@
-// Админ-панель для результатов голосования с синхронизацией через GitHub
-// Версия: 2.0 - Добавлена синхронизация данных
+// Админ-панель для результатов голосования с синхронизацией через GitHub Gists
+// Версия: 4.0 - Сбор данных из всех Gist'ов
 
 let votingResults = [];
 let isDataLoading = false;
@@ -29,38 +29,94 @@ async function loadVotingDataFromGitHub() {
     isDataLoading = true;
     
     try {
+        // Загружаем основные данные
         const response = await fetch(ADMIN_GITHUB_RAW_URL + '?t=' + Date.now());
+        let mainData = {};
+        
         if (response.ok) {
-            const data = await response.json();
-            
-            // Преобразуем данные в формат для админки
-            votingResults = [];
-            if (data.votes) {
-                Object.keys(data.votes).forEach(photoId => {
-                    votingResults.push({
-                        id: parseInt(photoId),
-                        title: `Фото ${photoId}`,
-                        image: `images/${photoId}.jpg`,
-                        votes: data.votes[photoId]
-                    });
+            mainData = await response.json();
+        }
+        
+        // Загружаем данные из Gist'ов
+        const gistData = await loadVotesFromGists();
+        
+        // Объединяем данные
+        const combinedVotes = { ...mainData.votes };
+        
+        // Добавляем голоса из Gist'ов
+        gistData.forEach(gist => {
+            if (gist.votes) {
+                Object.keys(gist.votes).forEach(photoId => {
+                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + gist.votes[photoId];
                 });
             }
-            
-            console.log('Данные загружены с GitHub:', votingResults);
-            
-            // Обновляем интерфейс
-            updateAllData();
-        } else {
-            console.log('Файл data.json не найден');
-            votingResults = [];
-            updateAllData();
-        }
+        });
+        
+        // Преобразуем данные в формат для админки
+        votingResults = [];
+        Object.keys(combinedVotes).forEach(photoId => {
+            votingResults.push({
+                id: parseInt(photoId),
+                title: `Фото ${photoId}`,
+                image: `images/${photoId === 12 ? '1-1' : photoId === 13 ? '1-1-1' : photoId === 14 ? '1-1-2' : photoId === 15 ? '1-2' : photoId}.jpg`,
+                votes: combinedVotes[photoId]
+            });
+        });
+        
+        console.log('Данные загружены с GitHub и Gist\'ов:', votingResults);
+        
+        // Обновляем интерфейс
+        updateAllData();
+        
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         // Загружаем локальные данные как fallback
         loadLocalVotingData();
     } finally {
         isDataLoading = false;
+    }
+}
+
+// Загрузка голосов из GitHub Gist'ов
+async function loadVotesFromGists() {
+    try {
+        // Получаем список Gist'ов пользователя
+        const response = await fetch('https://api.github.com/users/palagina00/gists?per_page=100', {
+            headers: {
+                'Authorization': 'token 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'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки Gist\'ов');
+        }
+        
+        const gists = await response.json();
+        const votingGists = gists.filter(gist => 
+            gist.description && gist.description.includes('Голосование')
+        );
+        
+        console.log('Найдено Gist\'ов с голосованием:', votingGists.length);
+        
+        // Загружаем данные из каждого Gist'а
+        const gistData = [];
+        for (const gist of votingGists) {
+            try {
+                const gistResponse = await fetch(gist.files['voting-data.json'].raw_url);
+                if (gistResponse.ok) {
+                    const data = await gistResponse.json();
+                    gistData.push(data);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки Gist\'а:', error);
+            }
+        }
+        
+        return gistData;
+        
+    } catch (error) {
+        console.error('Ошибка загрузки Gist\'ов:', error);
+        return [];
     }
 }
 
@@ -250,7 +306,6 @@ async function saveDataToGitHub(data) {
         
         // Подготавливаем данные для отправки
         const content = btoa(JSON.stringify(data, null, 2));
-        
         const updateData = {
             message: `Очистка данных голосования - ${new Date().toLocaleString()}`,
             content: content,
@@ -262,7 +317,7 @@ async function saveDataToGitHub(data) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'token ' + getGitHubToken()
+                'Authorization': 'token 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'
             },
             body: JSON.stringify(updateData)
         });
@@ -277,11 +332,6 @@ async function saveDataToGitHub(data) {
         console.error('Ошибка сохранения данных:', error);
         return false;
     }
-}
-
-// Получение токена GitHub
-function getGitHubToken() {
-    return localStorage.getItem('github_token') || '';
 }
 
 // Экспорт данных
