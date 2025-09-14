@@ -1,5 +1,5 @@
-// Система голосования за белье с синхронизацией через GitHub
-// Версия: 4.0 - Исправлена синхронизация данных
+// Система голосования за белье с синхронизацией через GitHub Issues
+// Версия: 6.0 - Используем GitHub Issues как базу данных
 
 // Данные о фотографиях
 const lingeriePhotos = [
@@ -116,12 +116,13 @@ let maxVotes = 5;
 let hasVoted = false;
 let isDataLoading = false;
 
-// URL для GitHub API (используем raw URL для чтения)
+// URL для GitHub API
+const GITHUB_ISSUES_URL = 'https://api.github.com/repos/palagina00/New/issues';
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/data.json';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Система голосования с синхронизацией загружена');
+    console.log('Система голосования с синхронизацией через GitHub Issues загружена');
     
     // Определяем мобильное устройство
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -130,8 +131,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Проверяем, голосовал ли пользователь уже
     checkVotingStatus();
     
-    // Загружаем данные голосования с GitHub
-    loadVotingDataFromGitHub();
+    // Загружаем данные голосования
+    loadVotingData();
     
     // Создаем интерфейс голосования
     createVotingInterface();
@@ -143,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupFeedbackForm();
     
     // Автообновление данных каждые 30 секунд
-    setInterval(loadVotingDataFromGitHub, 30000);
+    setInterval(loadVotingData, 30000);
 });
 
 // Проверка статуса голосования
@@ -160,40 +161,82 @@ function checkVotingStatus() {
     }
 }
 
-// Загрузка данных голосования с GitHub
-async function loadVotingDataFromGitHub() {
+// Загрузка данных голосования
+async function loadVotingData() {
     if (isDataLoading) return;
     
     isDataLoading = true;
     
     try {
-        const response = await fetch(GITHUB_RAW_URL + '?t=' + Date.now());
-        if (response.ok) {
-            const data = await response.json();
-            
-            // Обновляем количество голосов для каждой фотографии
-            if (data.votes) {
-                lingeriePhotos.forEach(photo => {
-                    if (data.votes[photo.id]) {
-                        photo.votes = data.votes[photo.id];
-                    }
+        // Загружаем данные из GitHub Issues
+        const issuesData = await loadVotesFromIssues();
+        
+        // Объединяем голоса из всех Issues
+        const combinedVotes = {};
+        
+        issuesData.forEach(issue => {
+            if (issue.votes) {
+                Object.keys(issue.votes).forEach(photoId => {
+                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + issue.votes[photoId];
                 });
             }
-            
-            console.log('Данные загружены с GitHub:', data);
-            
-            // Обновляем интерфейс
-            updateVotingInterface();
-        } else {
-            console.log('Файл data.json не найден, используем локальные данные');
-            loadLocalVotingData();
-        }
+        });
+        
+        // Обновляем количество голосов для каждой фотографии
+        lingeriePhotos.forEach(photo => {
+            photo.votes = combinedVotes[photo.id] || 0;
+        });
+        
+        console.log('Данные загружены из GitHub Issues:', combinedVotes);
+        
+        // Обновляем интерфейс
+        updateVotingInterface();
+        
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         // Загружаем локальные данные как fallback
         loadLocalVotingData();
     } finally {
         isDataLoading = false;
+    }
+}
+
+// Загрузка голосов из GitHub Issues
+async function loadVotesFromIssues() {
+    try {
+        const response = await fetch(GITHUB_ISSUES_URL + '?state=all&per_page=100');
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки Issues');
+        }
+        
+        const issues = await response.json();
+        const votingIssues = issues.filter(issue => 
+            issue.title.includes('Голосование') && issue.body
+        );
+        
+        console.log('Найдено Issues с голосованием:', votingIssues.length);
+        
+        // Парсим данные из Issues
+        const votesData = [];
+        votingIssues.forEach(issue => {
+            try {
+                // Ищем JSON в теле Issue
+                const jsonMatch = issue.body.match(/```json\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) {
+                    const data = JSON.parse(jsonMatch[1]);
+                    votesData.push(data);
+                }
+            } catch (error) {
+                console.error('Ошибка парсинга Issue:', error);
+            }
+        });
+        
+        return votesData;
+        
+    } catch (error) {
+        console.error('Ошибка загрузки Issues:', error);
+        return [];
     }
 }
 
@@ -454,8 +497,8 @@ async function submitVotes() {
         // Показываем уведомление
         showNotification('Голосование успешно сохранено! Данные будут синхронизированы с сервером.', 'success');
         
-        // Отправляем данные на сервер через GitHub Gist (обход CORS)
-        await sendVotesToGist(dataToSave);
+        // Отправляем данные на сервер через GitHub Issue
+        await sendVotesToIssue(dataToSave);
         
     } catch (error) {
         console.error('Ошибка отправки голосов:', error);
@@ -467,49 +510,46 @@ async function submitVotes() {
     }
 }
 
-// Отправка голосов на GitHub Gist (обход CORS)
-async function sendVotesToGist(data) {
+// Отправка голосов в GitHub Issue
+async function sendVotesToIssue(data) {
     try {
-        // Создаем Gist с данными голосования
-        const gistData = {
-            description: `Голосование - ${new Date().toLocaleString()}`,
-            public: true,
-            files: {
-                'voting-data.json': {
-                    content: JSON.stringify(data, null, 2)
-                }
-            }
+        // Создаем Issue с данными голосования
+        const issueData = {
+            title: `Голосование - ${new Date().toLocaleString()}`,
+            body: `Данные голосования:\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n\nВремя: ${new Date().toLocaleString()}\nПользователь: ${navigator.userAgent}`,
+            labels: ['голосование', 'данные']
         };
         
-        const response = await fetch('https://api.github.com/gists', {
+        const response = await fetch(GITHUB_ISSUES_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'token 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'
             },
-            body: JSON.stringify(gistData)
+            body: JSON.stringify(issueData)
         });
         
         if (response.ok) {
             const result = await response.json();
-            console.log('Данные отправлены в Gist:', result.html_url);
-            
-            // Сохраняем ссылку на Gist для админ-панели
-            localStorage.setItem('lastGistUrl', result.html_url);
+            console.log('Данные отправлены в Issue:', result.html_url);
             
             showNotification('Голосование синхронизировано с сервером!', 'success');
         } else {
-            throw new Error('Ошибка создания Gist');
+            throw new Error('Ошибка создания Issue');
         }
     } catch (error) {
-        console.error('Ошибка отправки в Gist:', error);
+        console.error('Ошибка отправки в Issue:', error);
         // Fallback: сохраняем в localStorage
-        const gistData = {
+        const issueData = {
             votes: data,
             timestamp: new Date().toISOString(),
-            url: 'local'
+            userAgent: navigator.userAgent,
+            url: window.location.href
         };
-        localStorage.setItem('pendingVotes', JSON.stringify(gistData));
+        
+        let allVotes = JSON.parse(localStorage.getItem('allVotes') || '[]');
+        allVotes.push(issueData);
+        localStorage.setItem('allVotes', JSON.stringify(allVotes));
     }
 }
 
