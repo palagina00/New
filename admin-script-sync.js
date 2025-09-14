@@ -80,13 +80,19 @@ function loadLocalVotingData() {
 // Настройка обработчиков событий
 function setupEventListeners() {
     // Обновление данных
-    document.getElementById('refreshData').addEventListener('click', function() {
-        loadVotingDataFromGitHub();
-        showNotification('Данные обновлены!', 'success');
-    });
+    const refreshBtn = document.getElementById('refreshData');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            loadVotingDataFromGitHub();
+            showNotification('Данные обновлены!', 'success');
+        });
+    }
     
     // Экспорт данных
-    document.getElementById('exportData').addEventListener('click', exportData);
+    const exportBtn = document.getElementById('exportData');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportData);
+    }
     
     // Очистка данных
     const clearDataBtn = document.getElementById('clearData');
@@ -115,28 +121,36 @@ function updateLastUpdateTime() {
 function updateStatistics() {
     const totalVotes = votingResults.reduce((sum, photo) => sum + photo.votes, 0);
     const totalVoters = Math.floor(totalVotes / 5); // Предполагаем, что каждый голосовал максимум 5 раз
-    const mostVoted = Math.max(...votingResults.map(photo => photo.votes), 0);
+    const mostVoted = votingResults.length > 0 ? Math.max(...votingResults.map(photo => photo.votes)) : 0;
     const avgVotes = votingResults.length > 0 ? (totalVotes / votingResults.length).toFixed(1) : 0;
     
-    document.getElementById('totalVotes').textContent = totalVotes;
-    document.getElementById('totalVoters').textContent = totalVoters;
-    document.getElementById('mostVoted').textContent = mostVoted;
-    document.getElementById('avgVotes').textContent = avgVotes;
+    const totalVotesEl = document.getElementById('totalVotes');
+    const totalVotersEl = document.getElementById('totalVoters');
+    const mostVotedEl = document.getElementById('mostVoted');
+    const avgVotesEl = document.getElementById('avgVotes');
+    
+    if (totalVotesEl) totalVotesEl.textContent = totalVotes;
+    if (totalVotersEl) totalVotersEl.textContent = totalVoters;
+    if (mostVotedEl) mostVotedEl.textContent = mostVoted;
+    if (avgVotesEl) avgVotesEl.textContent = avgVotes;
 }
 
 // Обновление таблицы
 function updateTable() {
     const tbody = document.getElementById('resultsTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     // Сортируем результаты по количеству голосов
     const sortedResults = [...votingResults].sort((a, b) => b.votes - a.votes);
     const totalVotes = votingResults.reduce((sum, photo) => sum + photo.votes, 0);
+    const maxVotes = votingResults.length > 0 ? Math.max(...votingResults.map(p => p.votes)) : 0;
     
     sortedResults.forEach((photo, index) => {
         const row = document.createElement('tr');
         const percentage = totalVotes > 0 ? ((photo.votes / totalVotes) * 100).toFixed(1) : 0;
-        const progressWidth = totalVotes > 0 ? (photo.votes / Math.max(...votingResults.map(p => p.votes))) * 100 : 0;
+        const progressWidth = maxVotes > 0 ? (photo.votes / maxVotes) * 100 : 0;
         
         row.innerHTML = `
             <td class="rank rank-${index + 1}">${index + 1}</td>
@@ -162,6 +176,8 @@ function updateTable() {
 // Обновление топ-5
 function updateTop5() {
     const topGrid = document.getElementById('topGrid');
+    if (!topGrid) return;
+    
     topGrid.innerHTML = '';
     
     // Сортируем и берем топ-5
