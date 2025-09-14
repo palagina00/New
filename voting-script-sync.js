@@ -1,5 +1,5 @@
 // Система голосования за белье с синхронизацией через GitHub
-// Версия: 3.0 - Исправлена проблема с CORS
+// Версия: 4.0 - Исправлена синхронизация данных
 
 // Данные о фотографиях
 const lingeriePhotos = [
@@ -454,8 +454,8 @@ async function submitVotes() {
         // Показываем уведомление
         showNotification('Голосование успешно сохранено! Данные будут синхронизированы с сервером.', 'success');
         
-        // Отправляем данные на сервер через форму (обход CORS)
-        await sendVotesToServer(dataToSave);
+        // Отправляем данные на сервер через GitHub Gist (обход CORS)
+        await sendVotesToGist(dataToSave);
         
     } catch (error) {
         console.error('Ошибка отправки голосов:', error);
@@ -467,43 +467,49 @@ async function submitVotes() {
     }
 }
 
-// Отправка голосов на сервер через скрытую форму (обход CORS)
-async function sendVotesToServer(data) {
+// Отправка голосов на GitHub Gist (обход CORS)
+async function sendVotesToGist(data) {
     try {
-        // Создаем скрытую форму для отправки данных
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'https://api.github.com/repos/palagina00/New/contents/data.json';
-        form.target = '_blank';
-        form.style.display = 'none';
+        // Создаем Gist с данными голосования
+        const gistData = {
+            description: `Голосование - ${new Date().toLocaleString()}`,
+            public: true,
+            files: {
+                'voting-data.json': {
+                    content: JSON.stringify(data, null, 2)
+                }
+            }
+        };
         
-        // Добавляем поля формы
-        const messageField = document.createElement('input');
-        messageField.type = 'hidden';
-        messageField.name = 'message';
-        messageField.value = `Обновление голосования - ${new Date().toLocaleString()}`;
+        const response = await fetch('https://api.github.com/gists', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'token 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'
+            },
+            body: JSON.stringify(gistData)
+        });
         
-        const contentField = document.createElement('input');
-        contentField.type = 'hidden';
-        contentField.name = 'content';
-        contentField.value = btoa(JSON.stringify(data, null, 2));
-        
-        const tokenField = document.createElement('input');
-        tokenField.type = 'hidden';
-        tokenField.name = 'token';
-        tokenField.value = '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';
-        
-        form.appendChild(messageField);
-        form.appendChild(contentField);
-        form.appendChild(tokenField);
-        
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-        
-        console.log('Данные отправлены на сервер через форму');
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Данные отправлены в Gist:', result.html_url);
+            
+            // Сохраняем ссылку на Gist для админ-панели
+            localStorage.setItem('lastGistUrl', result.html_url);
+            
+            showNotification('Голосование синхронизировано с сервером!', 'success');
+        } else {
+            throw new Error('Ошибка создания Gist');
+        }
     } catch (error) {
-        console.error('Ошибка отправки на сервер:', error);
+        console.error('Ошибка отправки в Gist:', error);
+        // Fallback: сохраняем в localStorage
+        const gistData = {
+            votes: data,
+            timestamp: new Date().toISOString(),
+            url: 'local'
+        };
+        localStorage.setItem('pendingVotes', JSON.stringify(gistData));
     }
 }
 
