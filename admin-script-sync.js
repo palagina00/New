@@ -1,53 +1,44 @@
-// Админ-панель для результатов голосования с синхронизацией через GitHub Gists
-// Версия: 4.0 - Сбор данных из всех Gist'ов
+// Админ-панель для результатов голосования с синхронизацией через GitHub Issues
+// Версия: 6.0 - Читаем данные из GitHub Issues
 
 let votingResults = [];
 let isDataLoading = false;
 
 // URL для GitHub API
+const GITHUB_ISSUES_URL = 'https://api.github.com/repos/palagina00/New/issues';
 const ADMIN_GITHUB_API_URL = 'https://api.github.com/repos/palagina00/New/contents/data.json';
-const ADMIN_GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/data.json';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Админ-панель с синхронизацией загружена');
+    console.log('Админ-панель с синхронизацией через GitHub Issues загружена');
     
-    // Загружаем данные голосования с GitHub
-    loadVotingDataFromGitHub();
+    // Загружаем данные голосования
+    loadVotingData();
     
     // Настраиваем обработчики событий
     setupEventListeners();
     
     // Автообновление данных каждые 10 секунд
-    setInterval(loadVotingDataFromGitHub, 10000);
+    setInterval(loadVotingData, 10000);
 });
 
-// Загрузка данных голосования с GitHub
-async function loadVotingDataFromGitHub() {
+// Загрузка данных голосования
+async function loadVotingData() {
     if (isDataLoading) return;
     
     isDataLoading = true;
     
     try {
-        // Загружаем основные данные
-        const response = await fetch(ADMIN_GITHUB_RAW_URL + '?t=' + Date.now());
-        let mainData = {};
+        // Загружаем данные из GitHub Issues
+        const issuesData = await loadVotesFromIssues();
         
-        if (response.ok) {
-            mainData = await response.json();
-        }
+        // Объединяем голоса из всех Issues
+        const combinedVotes = {};
         
-        // Загружаем данные из Gist'ов
-        const gistData = await loadVotesFromGists();
-        
-        // Объединяем данные
-        const combinedVotes = { ...mainData.votes };
-        
-        // Добавляем голоса из Gist'ов
-        gistData.forEach(gist => {
-            if (gist.votes) {
-                Object.keys(gist.votes).forEach(photoId => {
-                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + gist.votes[photoId];
+        issuesData.forEach(issue => {
+            if (issue.votes) {
+                Object.keys(issue.votes).forEach(photoId => {
+                    combinedVotes[photoId] = (combinedVotes[photoId] || 0) + issue.votes[photoId];
                 });
             }
         });
@@ -63,7 +54,8 @@ async function loadVotingDataFromGitHub() {
             });
         });
         
-        console.log('Данные загружены с GitHub и Gist\'ов:', votingResults);
+        console.log('Данные загружены из GitHub Issues:', votingResults);
+        console.log('Найдено Issues с голосованием:', issuesData.length);
         
         // Обновляем интерфейс
         updateAllData();
@@ -77,45 +69,41 @@ async function loadVotingDataFromGitHub() {
     }
 }
 
-// Загрузка голосов из GitHub Gist'ов
-async function loadVotesFromGists() {
+// Загрузка голосов из GitHub Issues
+async function loadVotesFromIssues() {
     try {
-        // Получаем список Gist'ов пользователя
-        const response = await fetch('https://api.github.com/users/palagina00/gists?per_page=100', {
-            headers: {
-                'Authorization': 'token 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'
+        const response = await fetch(GITHUB_ISSUES_URL + '?state=all&per_page=100');
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки Issues');
+        }
+        
+        const issues = await response.json();
+        const votingIssues = issues.filter(issue => 
+            issue.title.includes('Голосование') && issue.body
+        );
+        
+        console.log('Найдено Issues с голосованием:', votingIssues.length);
+        
+        // Парсим данные из Issues
+        const votesData = [];
+        votingIssues.forEach(issue => {
+            try {
+                // Ищем JSON в теле Issue
+                const jsonMatch = issue.body.match(/```json\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) {
+                    const data = JSON.parse(jsonMatch[1]);
+                    votesData.push(data);
+                }
+            } catch (error) {
+                console.error('Ошибка парсинга Issue:', error);
             }
         });
         
-        if (!response.ok) {
-            throw new Error('Ошибка загрузки Gist\'ов');
-        }
-        
-        const gists = await response.json();
-        const votingGists = gists.filter(gist => 
-            gist.description && gist.description.includes('Голосование')
-        );
-        
-        console.log('Найдено Gist\'ов с голосованием:', votingGists.length);
-        
-        // Загружаем данные из каждого Gist'а
-        const gistData = [];
-        for (const gist of votingGists) {
-            try {
-                const gistResponse = await fetch(gist.files['voting-data.json'].raw_url);
-                if (gistResponse.ok) {
-                    const data = await gistResponse.json();
-                    gistData.push(data);
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки Gist\'а:', error);
-            }
-        }
-        
-        return gistData;
+        return votesData;
         
     } catch (error) {
-        console.error('Ошибка загрузки Gist\'ов:', error);
+        console.error('Ошибка загрузки Issues:', error);
         return [];
     }
 }
@@ -139,7 +127,7 @@ function setupEventListeners() {
     const refreshBtn = document.getElementById('refreshData');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
-            loadVotingDataFromGitHub();
+            loadVotingData();
             showNotification('Данные обновлены!', 'success');
         });
     }
@@ -277,6 +265,7 @@ async function clearAllData() {
             // Очищаем локальные данные
             localStorage.removeItem('votingData');
             localStorage.removeItem('feedbacks');
+            localStorage.removeItem('allVotes');
             
             // Обновляем интерфейс
             votingResults = [];
