@@ -120,6 +120,9 @@ let isDataLoading = false;
 const GITHUB_ISSUES_URL = 'https://api.github.com/repos/palagina00/New/issues';
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/palagina00/New/main/data.json';
 
+// Принудительное обновление кэша
+console.log('Версия скрипта: 7.0 - с обновленным токеном');
+
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Система голосования с синхронизацией через GitHub Issues загружена');
